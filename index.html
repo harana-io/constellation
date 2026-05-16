@@ -98,7 +98,8 @@
   }
 
   .pill {
-    display: inline-flex; align-items: center; gap: 8px;
+    display: inline-flex; align-items: center; gap: 4px 4px;
+    flex-wrap: wrap; justify-content: center;
     padding: 6px 12px; border-radius: 999px;
     background: rgba(247,233,194,0.08);
     border: 1px solid rgba(247,233,194,0.2);
@@ -106,8 +107,8 @@
   }
 
   /* TITLE SCREEN */
-  .title-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(20px, 5vmin, 32px); padding: 24px; text-align: center; }
-  .title-mark { font-family: "Cormorant Garamond", "Georgia", serif; font-style: italic; font-size: clamp(30px, 9.5vw, 80px); line-height: 0.95; letter-spacing: -0.01em; white-space: nowrap; }
+  .title-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: clamp(18px, 4vmin, 28px); padding: clamp(48px, 10vh, 88px) 20px 24px; text-align: center; }
+  .title-mark { font-family: "Cormorant Garamond", "Georgia", serif; font-style: italic; font-size: clamp(40px, 10.5vw, 96px); line-height: 0.95; letter-spacing: -0.01em; white-space: nowrap; }
   .title-mark .star { color: var(--gold); display: inline-block; transform: translateY(-0.1em); }
   .tagline { color: var(--ink-dim); max-width: 280px; font-size: 15px; }
 
@@ -358,10 +359,16 @@ function render() {
 
 function renderTitle() {
   return el('div', {class:'title-wrap'},
-    el('div', {class:'pill mono'}, 'a party game · 2–4 players · pass & play'),
     el('div', {class:'title-mark'},
       el('span', {}, 'Constellation'),
       el('span', {class:'star'}, ' ★')
+    ),
+    el('div', {class:'pill mono'},
+      el('span', {style:'white-space:nowrap'}, 'a party game'),
+      ' · ',
+      el('span', {style:'white-space:nowrap'}, '2–4 players'),
+      ' · ',
+      el('span', {style:'white-space:nowrap'}, 'pass & play')
     ),
     el('div', {class:'tagline'}, 'Five strokes. One secret shape. Whoever reads the stars best wins.'),
     el('div', {class:'flex col gap-1', style:'width:100%; max-width:300px;'},
