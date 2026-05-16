@@ -58,7 +58,7 @@
   .flex { display: flex; }
   .col { flex-direction: column; }
   .gap-1 { gap: 8px; } .gap-2 { gap: 14px; } .gap-3 { gap: 22px; } .gap-4 { gap: 32px; }
-  .grow { flex: 1; }
+  .grow { flex: 1; min-height: 0; }
   .mt-2 { margin-top: 14px; } .mt-3 { margin-top: 22px; } .mt-4 { margin-top: 32px; }
 
   .btn {
@@ -119,9 +119,9 @@
   .seg button.active { background: rgba(247,233,194,0.15); color: var(--ink); box-shadow: 0 0 16px rgba(247,233,194,0.1); }
 
   /* PASS SCREEN */
-  .pass-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 24px; text-align: center; }
+  .pass-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(12px, 3vmin, 22px); padding: clamp(16px, 4vmin, 24px); text-align: center; }
   .pass-name { font-family: "Cormorant Garamond", serif; font-size: clamp(40px, 12vw, 64px); line-height: 1; }
-  .secret-icon { font-size: 96px; filter: drop-shadow(0 0 24px var(--gold)); }
+  .secret-icon { font-size: clamp(60px, 15vmin, 96px); filter: drop-shadow(0 0 24px var(--gold)); }
   .secret-name { font-family: "Cormorant Garamond", serif; font-size: clamp(34px, 9vw, 48px); color: var(--gold); }
 
   /* DRAW PHASE */
@@ -136,7 +136,7 @@
   .hint .icon { font-size: 18px; }
 
   /* VOTE */
-  .vote-canvas-wrap { position: relative; width: 100%; aspect-ratio: 1; border-radius: 18px; overflow: hidden; border: 1px solid rgba(247,233,194,0.15); background: rgba(6,9,32,0.5); }
+  .vote-canvas-wrap { position: relative; width: 100%; aspect-ratio: 1; border-radius: 18px; overflow: hidden; border: 1px solid rgba(247,233,194,0.15); background: rgba(6,9,32,0.5); margin: 0 auto; }
   .vote-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
   .vote-author { position: absolute; bottom: 10px; left: 10px; display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(6,9,32,0.7); border-radius: 999px; font-size: 13px; backdrop-filter: blur(6px); }
   .shape-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
@@ -265,12 +265,12 @@ const PLAYER_COLORS = ['var(--p1)', 'var(--p2)', 'var(--p3)', 'var(--p4)'];
 const PLAYER_HEX    = ['#f5c66b', '#6fe2d8', '#ff8aa8', '#b48cff'];
 
 const TWIST = [
-  { name: 'A Fresh Sky',         desc: 'The first match. Find your style. You\'ve got three strokes and a secret shape — nothing else matters.' },
+  { name: 'A Fresh Sky',         desc: 'The first match. Find your style. You\'ve got five strokes and a secret shape — nothing else matters.' },
   { name: 'Mid-Sky',             desc: 'You\'ve seen how each other draws now. Try to surprise them. New shapes, fresh canvases.' },
   { name: 'Final Constellation', desc: 'Last match of the night. Whatever you\'ve learned, this is when it pays off. Make it count.' },
 ];
 
-const STROKES_PER_PLAYER = 3;
+const STROKES_PER_PLAYER = 5;
 const TOTAL_MATCHES = 3;
 
 /* ====================== STATE ====================== */
@@ -363,7 +363,7 @@ function renderTitle() {
       el('span', {}, 'Constellation'),
       el('span', {class:'star'}, ' ★')
     ),
-    el('div', {class:'tagline'}, 'Three strokes. One secret shape. Whoever reads the stars best wins.'),
+    el('div', {class:'tagline'}, 'Five strokes. One secret shape. Whoever reads the stars best wins.'),
     el('div', {class:'flex col gap-1', style:'width:100%; max-width:300px;'},
       el('button', {class:'btn primary block', onclick: () => { ac(); chime(); S = { screen:'setup', players:['','','',''], count:4 }; render(); }}, 'New Game'),
       el('button', {class:'btn ghost block small dim', onclick: showRules}, 'How to play')
@@ -376,7 +376,7 @@ function showRules() {
     el('div', {class:'card', style:'max-width:380px; text-align:left;'},
       el('h2', {}, 'How to play'),
       el('p', {class:'dim', style:'margin-top:14px;'}, '1. Each player is given a secret shape. Don\'t show anyone.'),
-      el('p', {class:'dim'}, '2. Take turns. On your turn you add ONE stroke to YOUR canvas, trying to evoke your shape. You get 3 strokes total across the match.'),
+      el('p', {class:'dim'}, '2. Take turns. On your turn you add ONE stroke to YOUR canvas, trying to evoke your shape. You get 5 strokes total across the match.'),
       el('p', {class:'dim'}, '3. After everyone has drawn, the phone passes around once more. Each player privately guesses what shape every OTHER player was drawing.'),
       el('p', {class:'dim'}, '4. Score: +2 per correct guess you make · +1 per voter who correctly reads YOUR canvas.'),
       el('p', {class:'dim'}, '5. Three matches per game. Each match has a new twist.'),
@@ -663,7 +663,7 @@ function renderVote() {
 
   wrap.appendChild(el('h3', {style:'padding: 0 4px 8px;'}, `What was ${target.name} drawing?`));
 
-  const canvasBox = el('div', {class:'vote-canvas-wrap'});
+  const canvasBox = el('div', {class:'vote-canvas-wrap', style:'max-width: clamp(150px, 52vmin, 240px);'});
   const cv = el('canvas');
   canvasBox.appendChild(cv);
   canvasBox.appendChild(el('div', {class:'vote-author'},
