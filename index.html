@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#070b1f">
+<title>Constellation — a party game for 2–4</title>
+<style>
+  :root {
+    --ink: #f7e9c2;
+    --ink-dim: #8a8aa8;
+    --bg-0: #060920;
+    --bg-1: #0c1438;
+    --bg-2: #1b2360;
+    --gold: #f5c66b;
+    --rose: #ff8aa8;
+    --teal: #6fe2d8;
+    --violet: #b48cff;
+    --green: #9fe07a;
+    --p1: #f5c66b;
+    --p2: #6fe2d8;
+    --p3: #ff8aa8;
+    --p4: #b48cff;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; overscroll-behavior: none; }
+  body {
+    font-family: ui-rounded, -apple-system, "SF Pro Rounded", system-ui, sans-serif;
+    color: var(--ink);
+    background: radial-gradient(ellipse at top, var(--bg-2) 0%, var(--bg-1) 35%, var(--bg-0) 100%);
+    background-attachment: fixed;
+    height: 100dvh;
+    position: relative;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  #stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  #app {
+    position: relative; z-index: 1;
+    height: 100dvh; width: 100vw;
+    display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+    overflow: hidden;
+  }
+
+  h1, h2, h3 { font-family: "Cormorant Garamond", "Iowan Old Style", "Georgia", serif; font-weight: 500; letter-spacing: 0.02em; margin: 0; }
+  h1 { font-size: clamp(40px, 11vw, 64px); line-height: 1; }
+  h2 { font-size: clamp(24px, 6.5vw, 34px); line-height: 1.1; }
+  h3 { font-size: clamp(18px, 4.5vw, 22px); }
+  p { line-height: 1.45; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0.04em; }
+  .dim { color: var(--ink-dim); }
+  .center { text-align: center; }
+  .flex { display: flex; }
+  .col { flex-direction: column; }
+  .gap-1 { gap: 8px; } .gap-2 { gap: 14px; } .gap-3 { gap: 22px; } .gap-4 { gap: 32px; }
+  .grow { flex: 1; }
+  .mt-2 { margin-top: 14px; } .mt-3 { margin-top: 22px; } .mt-4 { margin-top: 32px; }
+
+  .btn {
+    appearance: none; border: 1px solid rgba(247, 233, 194, 0.25);
+    background: linear-gradient(180deg, rgba(247,233,194,0.10), rgba(247,233,194,0.04));
+    color: var(--ink); padding: 16px 22px; border-radius: 999px;
+    font: inherit; font-size: 17px; font-weight: 500;
+    cursor: pointer; transition: transform 0.08s ease, background 0.2s;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 8px 24px rgba(0,0,0,0.25);
+  }
+  .btn:active { transform: scale(0.97); background: rgba(247,233,194,0.18); }
+  .btn.primary {
+    background: linear-gradient(180deg, var(--gold), #d09a3a);
+    color: #1a1404; border-color: rgba(255,255,255,0.4);
+    font-weight: 600;
+    box-shadow: 0 0 24px rgba(245, 198, 107, 0.35), 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .btn.ghost { background: transparent; }
+  .btn.small { padding: 10px 16px; font-size: 14px; }
+  .btn.block { width: 100%; }
+  .btn[disabled] { opacity: 0.4; pointer-events: none; }
+
+  .input {
+    appearance: none; border: 1px solid rgba(247,233,194,0.2);
+    background: rgba(11, 16, 44, 0.5); color: var(--ink);
+    padding: 14px 18px; border-radius: 14px; font: inherit; font-size: 17px;
+    width: 100%; outline: none;
+  }
+  .input:focus { border-color: var(--gold); }
+
+  .card {
+    background: linear-gradient(180deg, rgba(27,35,96,0.55), rgba(11,16,44,0.55));
+    border: 1px solid rgba(247,233,194,0.15);
+    border-radius: 22px; padding: 22px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px;
+    background: rgba(247,233,194,0.08);
+    border: 1px solid rgba(247,233,194,0.2);
+    font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+
+  /* TITLE SCREEN */
+  .title-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 32px; padding: 24px; text-align: center; }
+  .title-mark { font-family: "Cormorant Garamond", "Georgia", serif; font-style: italic; font-size: clamp(56px, 16vw, 96px); line-height: 0.95; letter-spacing: -0.01em; }
+  .title-mark .star { color: var(--gold); display: inline-block; transform: translateY(-0.1em); }
+  .tagline { color: var(--ink-dim); max-width: 280px; font-size: 15px; }
+
+  /* SETUP */
+  .player-row { display: flex; align-items: center; gap: 12px; }
+  .swatch { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 12px currentColor; }
+  .seg { display: flex; gap: 4px; background: rgba(11,16,44,0.5); border: 1px solid rgba(247,233,194,0.15); border-radius: 14px; padding: 4px; }
+  .seg button { flex: 1; appearance: none; background: transparent; color: var(--ink-dim); border: none; padding: 12px; border-radius: 10px; font: inherit; font-size: 15px; cursor: pointer; transition: all 0.15s; }
+  .seg button.active { background: rgba(247,233,194,0.15); color: var(--ink); box-shadow: 0 0 16px rgba(247,233,194,0.1); }
+
+  /* PASS SCREEN */
+  .pass-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 24px; text-align: center; }
+  .pass-name { font-family: "Cormorant Garamond", serif; font-size: clamp(40px, 12vw, 64px); line-height: 1; }
+  .secret-icon { font-size: 96px; filter: drop-shadow(0 0 24px var(--gold)); }
+  .secret-name { font-family: "Cormorant Garamond", serif; font-size: clamp(34px, 9vw, 48px); color: var(--gold); }
+
+  /* DRAW PHASE */
+  .draw-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 12px; }
+  .draw-header .left { display: flex; align-items: center; gap: 10px; }
+  .stroke-dots { display: flex; gap: 6px; }
+  .stroke-dots .dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(247,233,194,0.15); border: 1px solid rgba(247,233,194,0.3); }
+  .stroke-dots .dot.used { background: currentColor; box-shadow: 0 0 8px currentColor; border-color: currentColor; }
+  .canvas-wrap { flex: 1; position: relative; border-radius: 22px; overflow: hidden; border: 1px solid rgba(247,233,194,0.15); background: radial-gradient(ellipse at center, rgba(27,35,96,0.4), rgba(6,9,32,0.6)); margin-bottom: 12px; }
+  canvas.draw { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .hint { position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(6,9,32,0.6); backdrop-filter: blur(6px); font-size: 13px; }
+  .hint .icon { font-size: 18px; }
+
+  /* VOTE */
+  .vote-canvas-wrap { position: relative; width: 100%; aspect-ratio: 1; border-radius: 18px; overflow: hidden; border: 1px solid rgba(247,233,194,0.15); background: rgba(6,9,32,0.5); }
+  .vote-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
+  .vote-author { position: absolute; bottom: 10px; left: 10px; display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(6,9,32,0.7); border-radius: 999px; font-size: 13px; backdrop-filter: blur(6px); }
+  .shape-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+  .shape-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border-radius: 12px; border: 1px solid rgba(247,233,194,0.15); background: rgba(11,16,44,0.4); color: var(--ink); cursor: pointer; transition: all 0.15s; font-size: 11px; }
+  .shape-btn .ico { font-size: 24px; }
+  .shape-btn.selected { background: rgba(245,198,107,0.18); border-color: var(--gold); box-shadow: 0 0 14px rgba(245,198,107,0.3); }
+  .shape-btn:active { transform: scale(0.95); }
+
+  /* REVEAL */
+  .reveal-card { position: relative; }
+  .truth { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: rgba(159, 224, 122, 0.12); border: 1px solid rgba(159,224,122,0.3); border-radius: 14px; margin-top: 12px; }
+  .truth.miss { background: rgba(255, 138, 168, 0.1); border-color: rgba(255,138,168,0.3); }
+  .truth .ico { font-size: 24px; }
+
+  /* SCOREBOARD */
+  .score-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-radius: 14px; background: rgba(11,16,44,0.5); border: 1px solid rgba(247,233,194,0.1); }
+  .score-row.lead { background: linear-gradient(90deg, rgba(245,198,107,0.18), rgba(245,198,107,0.04)); border-color: rgba(245,198,107,0.4); }
+  .score-num { font-family: "Cormorant Garamond", serif; font-size: 32px; line-height: 1; color: var(--gold); }
+
+  /* SCROLLABLE CONTENT AREAS */
+  .scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 20px; }
+  .scroll::-webkit-scrollbar { width: 0; }
+
+  /* FADE */
+  .fade-in { animation: fadein 0.5s ease both; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .pulse { animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+  /* COVER OVERLAY */
+  .cover {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    background: radial-gradient(ellipse at center, rgba(11,16,44,0.96), rgba(6,9,32,0.99));
+    text-align: center; padding: 32px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div id="app"></div>
+
+<script>
+"use strict";
+
+/* ====================== AUDIO ====================== */
+let audioCtx = null;
+function ac() { if (!audioCtx) try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} return audioCtx; }
+function tone(freq, dur=0.18, type='sine', gain=0.08) {
+  const c = ac(); if (!c) return;
+  const o = c.createOscillator(); const g = c.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, c.currentTime);
+  g.gain.linearRampToValueAtTime(gain, c.currentTime + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur);
+  o.connect(g).connect(c.destination);
+  o.start(); o.stop(c.currentTime + dur);
+}
+function chime() { tone(880, 0.2, 'sine', 0.06); setTimeout(()=>tone(1320, 0.25, 'sine', 0.05), 80); }
+function stroke() { tone(440 + Math.random()*60, 0.08, 'triangle', 0.04); }
+function reveal() { tone(523, 0.18); setTimeout(()=>tone(659, 0.18), 100); setTimeout(()=>tone(784, 0.32), 200); }
+function ding() { tone(1320, 0.12, 'sine', 0.07); }
+function fail() { tone(220, 0.2, 'sawtooth', 0.04); }
+
+/* ====================== STARFIELD ====================== */
+(function starfield() {
+  const cv = document.getElementById('stars');
+  const ctx = cv.getContext('2d');
+  let stars = [];
+  function resize() {
+    cv.width = window.innerWidth * devicePixelRatio;
+    cv.height = window.innerHeight * devicePixelRatio;
+    cv.style.width = window.innerWidth + 'px';
+    cv.style.height = window.innerHeight + 'px';
+    stars = [];
+    const count = Math.floor((cv.width * cv.height) / 12000);
+    for (let i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random() * cv.width,
+        y: Math.random() * cv.height,
+        r: Math.random() * 1.4 + 0.2,
+        a: Math.random() * 0.7 + 0.2,
+        tw: Math.random() * 0.02 + 0.005,
+        ph: Math.random() * Math.PI * 2
+      });
+    }
+  }
+  resize(); window.addEventListener('resize', resize);
+  function frame(t) {
+    ctx.clearRect(0,0,cv.width,cv.height);
+    for (const s of stars) {
+      const a = s.a * (0.6 + 0.4 * Math.sin(t * s.tw + s.ph));
+      ctx.fillStyle = `rgba(247,233,194,${a})`;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r * devicePixelRatio, 0, Math.PI*2); ctx.fill();
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+/* ====================== GAME DATA ====================== */
+const SHAPES = [
+  {name: 'Cat',      icon: '🐱'},
+  {name: 'Rocket',   icon: '🚀'},
+  {name: 'Ghost',    icon: '👻'},
+  {name: 'Tree',     icon: '🌳'},
+  {name: 'Fish',     icon: '🐟'},
+  {name: 'Eye',      icon: '👁️'},
+  {name: 'Mountain', icon: '⛰️'},
+  {name: 'Heart',    icon: '❤️'},
+  {name: 'Crown',    icon: '👑'},
+  {name: 'Key',      icon: '🔑'},
+  {name: 'Snake',    icon: '🐍'},
+  {name: 'House',    icon: '🏠'},
+  {name: 'Boat',     icon: '⛵'},
+  {name: 'Bird',     icon: '🦅'},
+  {name: 'Sword',    icon: '⚔️'},
+  {name: 'Lightning',icon: '⚡'},
+  {name: 'Skull',    icon: '💀'},
+  {name: 'Cup',      icon: '🍷'},
+  {name: 'Apple',    icon: '🍎'},
+  {name: 'Octopus',  icon: '🐙'},
+];
+
+const PLAYER_COLORS = ['var(--p1)', 'var(--p2)', 'var(--p3)', 'var(--p4)'];
+const PLAYER_HEX    = ['#f5c66b', '#6fe2d8', '#ff8aa8', '#b48cff'];
+
+const TWIST = [
+  null,                                  // match 1: pure
+  { name: 'Mirrored Match', desc: 'Your last stroke is automatically mirrored on a random opponent\'s canvas.' },
+  { name: 'Whispered Match', desc: 'After drawing, secretly write a 1-word "title" — shown at the reveal.' },
+];
+
+const STROKES_PER_PLAYER = 3;
+const TOTAL_MATCHES = 3;
+
+/* ====================== STATE ====================== */
+let S = null;
+
+function newGame(players) {
+  S = {
+    screen: 'reveal-shape',
+    players: players.map((name, i) => ({
+      name: name.trim() || `Player ${i+1}`,
+      color: PLAYER_HEX[i],
+      score: 0,
+      shape: null,
+      whisper: '',
+      strokesByPlayer: [], // strokes drawn ON this player's canvas (during draw phase) — only own player draws on own canvas
+      receivedVotes: {},   // {voterName: shapeName}
+    })),
+    match: 0,
+    shapeReveals: 0,
+    drawTurnPlayer: 0,
+    drawTurnIndex: 0,        // 0..N*STROKES-1 across all draws this match
+    voteIndex: 0,            // which player is currently voting
+    voteTargetIdx: 0,        // which canvas they're voting on next
+    voteSelections: {},      // {voterName: {targetName: shapeName}}
+    revealIndex: 0,
+    twistAcked: false,
+  };
+  assignShapes();
+  render();
+}
+
+function assignShapes() {
+  const pool = [...SHAPES].sort(() => Math.random() - 0.5);
+  S.players.forEach((p, i) => { p.shape = pool[i]; p.whisper = ''; p.strokesByPlayer = []; p.receivedVotes = {}; });
+  S.shapeReveals = 0;
+  S.drawTurnPlayer = 0;
+  S.drawTurnIndex = 0;
+  S.voteIndex = 0;
+  S.voteTargetIdx = 0;
+  S.voteSelections = {};
+  S.revealIndex = 0;
+  S.twistAcked = false;
+  S.screen = TWIST[S.match] ? 'twist' : 'reveal-shape';
+}
+
+/* ====================== HELPERS ====================== */
+const app = () => document.getElementById('app');
+const el = (tag, props={}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const k in props) {
+    if (k === 'class') e.className = props[k];
+    else if (k === 'style') e.setAttribute('style', props[k]);
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), props[k]);
+    else if (k === 'html') e.innerHTML = props[k];
+    else e[k] = props[k];
+  }
+  for (const k of kids.flat()) {
+    if (k == null) continue;
+    e.appendChild(typeof k === 'string' ? document.createTextNode(k) : k);
+  }
+  return e;
+};
+
+function render() {
+  const root = app();
+  root.innerHTML = '';
+  const screen = ({
+    title:         renderTitle,
+    setup:         renderSetup,
+    twist:         renderTwist,
+    'reveal-shape':renderRevealShape,
+    'pass-draw':   renderPassDraw,
+    draw:          renderDraw,
+    'pass-vote':   renderPassVote,
+    vote:          renderVote,
+    'pass-reveal': renderPassReveal,
+    reveal:        renderReveal,
+    score:         renderScore,
+    end:           renderEnd,
+  })[S?.screen || 'title']();
+  screen.classList.add('fade-in');
+  root.appendChild(screen);
+}
+
+/* ====================== SCREENS ====================== */
+
+function renderTitle() {
+  return el('div', {class:'title-wrap'},
+    el('div', {class:'pill mono'}, 'a party game · 2–4 players · pass & play'),
+    el('div', {class:'title-mark'},
+      el('span', {}, 'Constellation'),
+      el('span', {class:'star'}, ' ★')
+    ),
+    el('div', {class:'tagline'}, 'Three strokes. One secret shape. Whoever reads the stars best wins.'),
+    el('div', {class:'flex col gap-1', style:'width:100%; max-width:300px;'},
+      el('button', {class:'btn primary block', onclick: () => { ac(); chime(); S = { screen:'setup', players:['','','',''], count:4 }; render(); }}, 'New Game'),
+      el('button', {class:'btn ghost block small dim', onclick: showRules}, 'How to play')
+    )
+  );
+}
+
+function showRules() {
+  const overlay = el('div', {class:'cover', onclick: () => overlay.remove()},
+    el('div', {class:'card', style:'max-width:380px; text-align:left;'},
+      el('h2', {}, 'How to play'),
+      el('p', {class:'dim', style:'margin-top:14px;'}, '1. Each player is given a secret shape. Don\'t show anyone.'),
+      el('p', {class:'dim'}, '2. Take turns. On your turn you add ONE stroke to YOUR canvas, trying to evoke your shape. You get 3 strokes total across the match.'),
+      el('p', {class:'dim'}, '3. After everyone has drawn, the phone passes around once more. Each player privately guesses what shape every OTHER player was drawing.'),
+      el('p', {class:'dim'}, '4. Score: +2 per correct guess you make · +1 per voter who correctly reads YOUR canvas.'),
+      el('p', {class:'dim'}, '5. Three matches per game. Each match has a new twist.'),
+      el('p', {class:'mono', style:'margin-top:18px; color: var(--gold);'}, 'Tap to dismiss')
+    )
+  );
+  app().appendChild(overlay);
+}
+
+function renderSetup() {
+  const update = () => render();
+  const setCount = (n) => { S.count = n; S.players = S.players.slice(0, n); while(S.players.length < n) S.players.push(''); update(); };
+
+  const rows = [];
+  for (let i = 0; i < S.count; i++) {
+    rows.push(el('div', {class:'player-row'},
+      el('div', {class:'swatch', style:`background:${PLAYER_HEX[i]}; color:${PLAYER_HEX[i]};`}),
+      el('input', {
+        class:'input', type:'text', placeholder:`Player ${i+1}`,
+        maxLength: 12, value: S.players[i] || '',
+        oninput: (e) => { S.players[i] = e.target.value; },
+      })
+    ));
+  }
+
+  return el('div', {class:'flex col grow scroll', style:'padding:24px 8px; gap:22px;'},
+    el('div', {class:'flex col gap-1'},
+      el('h2', {}, 'Who\'s playing tonight?'),
+      el('div', {class:'dim'}, 'Tap to enter names. The phone will pass between you — only the active player should look.')
+    ),
+    el('div', {class:'seg'},
+      ...[2,3,4].map(n => el('button', {
+        class: S.count === n ? 'active' : '',
+        onclick: () => setCount(n)
+      }, `${n} players`))
+    ),
+    el('div', {class:'flex col gap-2'}, rows),
+    el('div', {class:'flex col gap-1', style:'margin-top:auto; padding-top:16px;'},
+      el('button', {class:'btn primary block', onclick: () => {
+        chime();
+        newGame(S.players.slice(0, S.count));
+      }}, 'Begin →'),
+      el('button', {class:'btn ghost block small dim', onclick: () => { S = null; render(); }}, '← Back')
+    )
+  );
+}
+
+function renderTwist() {
+  const t = TWIST[S.match];
+  return el('div', {class:'pass-wrap', onclick: () => { ding(); S.screen = 'reveal-shape'; render(); }},
+    el('div', {class:'pill mono'}, `match ${S.match + 1} of ${TOTAL_MATCHES}`),
+    el('h2', {style:'color: var(--gold); margin-top: 12px;'}, t ? t.name : 'A Fresh Sky'),
+    el('div', {class:'dim', style:'max-width:300px; margin-top:4px;'}, t ? t.desc : 'The first match. No twists — just learn the rhythm.'),
+    el('div', {class:'pulse mono dim', style:'margin-top:auto; padding-bottom: 20px;'}, 'tap to continue')
+  );
+}
+
+function renderRevealShape() {
+  const i = S.shapeReveals;
+  if (i >= S.players.length) {
+    S.screen = 'pass-draw';
+    return renderPassDraw();
+  }
+  const p = S.players[i];
+  let revealed = false;
+
+  const card = el('div', {class:'pass-wrap'},
+    el('div', {class:'pill mono'}, 'private'),
+    el('div', {class:'pass-name'}, p.name),
+    el('div', {class:'dim'}, 'Make sure no one else can see the screen.'),
+    el('button', {class:'btn primary', onclick: () => {
+      if (revealed) {
+        S.shapeReveals++;
+        ding();
+        render();
+      } else {
+        revealed = true;
+        secretBox.style.display = 'flex';
+        revealBtn.textContent = 'Got it · pass the phone →';
+        chime();
+      }
+    }}, 'Show me my shape')
+  );
+  const revealBtn = card.querySelector('.btn');
+  const secretBox = el('div', {class:'flex col gap-1', style:'align-items:center; display:none;'},
+    el('div', {class:'secret-icon'}, p.shape.icon),
+    el('div', {class:'secret-name'}, p.shape.name)
+  );
+  card.insertBefore(secretBox, revealBtn);
+  return card;
+}
+
+function renderPassDraw() {
+  const player = S.players[S.drawTurnPlayer];
+  const strokeNum = S.players[S.drawTurnPlayer].strokesByPlayer.length + 1;
+  return el('div', {class:'pass-wrap', onclick: () => { ding(); S.screen = 'draw'; render(); }},
+    el('div', {class:'pill mono', style:`color:${player.color}; border-color:${player.color}80;`}, `stroke ${strokeNum} of ${STROKES_PER_PLAYER}`),
+    el('div', {class:'pass-name', style:`color:${player.color}`}, player.name),
+    el('div', {class:'dim'}, 'Pass the phone. Only you may look.'),
+    el('div', {class:'pulse mono dim', style:'margin-top:auto; padding-bottom: 20px;'}, 'tap when ready')
+  );
+}
+
+function renderDraw() {
+  const player = S.players[S.drawTurnPlayer];
+  const strokeNum = player.strokesByPlayer.length;
+
+  const wrap = el('div', {class:'flex col grow', style:'padding-top:8px;'});
+  const header = el('div', {class:'draw-header'},
+    el('div', {class:'left'},
+      el('div', {class:'swatch', style:`background:${player.color}; color:${player.color}; width:18px; height:18px;`}),
+      el('div', {style:'font-weight:600;'}, player.name)
+    ),
+    el('div', {class:'stroke-dots', style:`color:${player.color}`},
+      ...Array.from({length: STROKES_PER_PLAYER}, (_, i) =>
+        el('div', {class: 'dot' + (i < strokeNum ? ' used' : '')})
+      )
+    )
+  );
+
+  const canvasWrap = el('div', {class:'canvas-wrap'});
+  const cv = el('canvas', {class:'draw'});
+  const hint = el('div', {class:'hint'},
+    el('span', {class:'icon'}, player.shape.icon),
+    el('span', {}, `your shape: ${player.shape.name}`)
+  );
+  canvasWrap.appendChild(cv);
+  canvasWrap.appendChild(hint);
+
+  wrap.appendChild(header);
+  wrap.appendChild(canvasWrap);
+
+  const note = el('div', {class:'dim center', style:'font-size:13px; padding: 0 12px 12px;'},
+    strokeNum === 0 ? 'Lift your finger to end the stroke. You only get one per turn.'
+                    : 'Add another stroke. Try to guide the picture without giving it away.'
+  );
+  wrap.appendChild(note);
+
+  setTimeout(() => setupDrawingCanvas(cv, player), 30);
+  return wrap;
+}
+
+function setupDrawingCanvas(cv, player) {
+  const wrap = cv.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  const ctx = cv.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  // Redraw existing strokes for this player
+  redrawStrokes(ctx, player.strokesByPlayer, W, H, player.color);
+
+  let drawing = false;
+  let current = null;
+  let endedTurn = false;
+
+  function getPt(e) {
+    const r = cv.getBoundingClientRect();
+    const t = (e.touches && e.touches[0]) || e.changedTouches?.[0] || e;
+    return [(t.clientX - r.left) / W, (t.clientY - r.top) / H]; // normalized 0..1
+  }
+
+  function down(e) {
+    e.preventDefault();
+    if (endedTurn || player.strokesByPlayer.length >= STROKES_PER_PLAYER) return;
+    drawing = true;
+    current = { color: player.color, pts: [getPt(e)] };
+    stroke();
+    drawLive();
+  }
+  function move(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    current.pts.push(getPt(e));
+    drawLive();
+  }
+  function up(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    drawing = false;
+    if (current && current.pts.length > 1) {
+      player.strokesByPlayer.push(current);
+      ding();
+      endedTurn = true;
+      setTimeout(() => advanceDrawTurn(), 350);
+    } else {
+      current = null;
+      redrawStrokes(ctx, player.strokesByPlayer, W, H, player.color);
+    }
+  }
+
+  function drawLive() {
+    redrawStrokes(ctx, player.strokesByPlayer, W, H, player.color);
+    if (current) drawStroke(ctx, current, W, H);
+  }
+
+  cv.addEventListener('pointerdown', down);
+  cv.addEventListener('pointermove', move);
+  cv.addEventListener('pointerup', up);
+  cv.addEventListener('pointercancel', up);
+}
+
+function drawStroke(ctx, strk, W, H) {
+  ctx.strokeStyle = strk.color;
+  ctx.shadowColor = strk.color;
+  ctx.shadowBlur = 8;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  for (let i = 0; i < strk.pts.length; i++) {
+    const [x, y] = strk.pts[i];
+    if (i === 0) ctx.moveTo(x * W, y * H);
+    else ctx.lineTo(x * W, y * H);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function redrawStrokes(ctx, strokes, W, H, _color) {
+  ctx.clearRect(0, 0, W, H);
+  for (const s of strokes) drawStroke(ctx, s, W, H);
+}
+
+function advanceDrawTurn() {
+  S.drawTurnIndex++;
+  const totalTurns = S.players.length * STROKES_PER_PLAYER;
+  if (S.drawTurnIndex >= totalTurns) {
+    // Done drawing — go to voting
+    S.voteIndex = 0;
+    S.screen = 'pass-vote';
+    render();
+    return;
+  }
+  // Round-robin: each pass goes to next player. After everyone's done stroke 1, then everyone's stroke 2, etc.
+  S.drawTurnPlayer = S.drawTurnIndex % S.players.length;
+  S.screen = 'pass-draw';
+  render();
+}
+
+function renderPassVote() {
+  if (S.voteIndex >= S.players.length) {
+    // Done voting
+    tallyVotes();
+    S.revealIndex = 0;
+    S.screen = 'pass-reveal';
+    render();
+    return el('div');
+  }
+  const player = S.players[S.voteIndex];
+  return el('div', {class:'pass-wrap', onclick: () => { ding(); S.screen = 'vote'; S.voteTargetIdx = 0; render(); }},
+    el('div', {class:'pill mono', style:`color:${player.color}; border-color:${player.color}80;`}, 'time to read the stars'),
+    el('div', {class:'pass-name', style:`color:${player.color}`}, player.name),
+    el('div', {class:'dim', style:'max-width:280px;'}, 'Look at every other player\'s canvas and guess what they were drawing. Your votes are private.'),
+    el('div', {class:'pulse mono dim', style:'margin-top:auto; padding-bottom: 20px;'}, 'tap when ready')
+  );
+}
+
+function renderVote() {
+  const voter = S.players[S.voteIndex];
+  // Build list of targets = players other than voter
+  const targets = S.players.filter(p => p.name !== voter.name);
+
+  if (S.voteTargetIdx >= targets.length) {
+    S.voteIndex++;
+    S.screen = 'pass-vote';
+    return renderPassVote();
+  }
+
+  const target = targets[S.voteTargetIdx];
+  if (!S.voteSelections[voter.name]) S.voteSelections[voter.name] = {};
+  const currentPick = S.voteSelections[voter.name][target.name];
+
+  // Build option pool: the shapes actually assigned this match (so 4 specific choices)
+  const usedShapes = S.players.map(p => p.shape);
+
+  const wrap = el('div', {class:'flex col grow scroll', style:'padding: 8px;'});
+  const header = el('div', {style:'display:flex; align-items:center; justify-content:space-between; padding: 4px 4px 12px;'},
+    el('div', {style:`font-weight:600; color:${voter.color}`}, voter.name),
+    el('div', {class:'mono dim', style:'font-size:12px;'}, `${S.voteTargetIdx + 1} / ${targets.length}`)
+  );
+  wrap.appendChild(header);
+
+  wrap.appendChild(el('h3', {style:'padding: 0 4px 8px;'}, `What was ${target.name} drawing?`));
+
+  const canvasBox = el('div', {class:'vote-canvas-wrap'});
+  const cv = el('canvas');
+  canvasBox.appendChild(cv);
+  canvasBox.appendChild(el('div', {class:'vote-author'},
+    el('div', {class:'swatch', style:`background:${target.color}; color:${target.color}; width:12px; height:12px;`}),
+    el('span', {}, target.name + '\'s canvas')
+  ));
+  wrap.appendChild(canvasBox);
+
+  const grid = el('div', {class:'shape-grid'});
+  usedShapes.forEach(shape => {
+    const btn = el('button', {
+      class: 'shape-btn' + (currentPick === shape.name ? ' selected' : ''),
+      onclick: () => {
+        S.voteSelections[voter.name][target.name] = shape.name;
+        render();
+      }
+    },
+      el('div', {class:'ico'}, shape.icon),
+      el('div', {}, shape.name)
+    );
+    grid.appendChild(btn);
+  });
+  wrap.appendChild(grid);
+
+  wrap.appendChild(el('button', {
+    class:'btn primary block',
+    style:'margin-top: 16px;',
+    disabled: !currentPick,
+    onclick: () => {
+      ding();
+      S.voteTargetIdx++;
+      render();
+    }
+  }, S.voteTargetIdx === targets.length - 1 ? 'Submit votes →' : 'Lock in →'));
+
+  setTimeout(() => {
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvasBox.clientWidth, H = canvasBox.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    redrawStrokes(ctx, target.strokesByPlayer, W, H);
+  }, 30);
+
+  return wrap;
+}
+
+function tallyVotes() {
+  // For each player, count how many voters identified their shape correctly
+  for (const target of S.players) {
+    let correct = 0;
+    for (const voter of S.players) {
+      if (voter.name === target.name) continue;
+      const guess = S.voteSelections[voter.name]?.[target.name];
+      target.receivedVotes[voter.name] = guess;
+      if (guess === target.shape.name) correct++;
+    }
+    target.score += correct; // +1 per voter who got yours right
+  }
+  // Each voter: +2 per correct guess
+  for (const voter of S.players) {
+    let correct = 0;
+    for (const target of S.players) {
+      if (target.name === voter.name) continue;
+      if (S.voteSelections[voter.name]?.[target.name] === target.shape.name) correct++;
+    }
+    voter.score += correct * 2;
+  }
+}
+
+function renderPassReveal() {
+  if (S.revealIndex >= S.players.length) {
+    S.screen = 'score';
+    render();
+    return el('div');
+  }
+  return el('div', {class:'pass-wrap', onclick: () => { reveal(); S.screen = 'reveal'; render(); }},
+    el('div', {class:'pill mono'}, `reveal ${S.revealIndex + 1} of ${S.players.length}`),
+    el('h2', {style:'font-size: clamp(32px,9vw,48px); color: var(--gold);'}, 'The stars align'),
+    el('div', {class:'dim', style:'max-width:280px;'}, 'Gather around. Show everyone.'),
+    el('div', {class:'pulse mono dim', style:'margin-top:auto; padding-bottom: 20px;'}, 'tap to reveal')
+  );
+}
+
+function renderReveal() {
+  const target = S.players[S.revealIndex];
+  const correctVoters = Object.entries(target.receivedVotes).filter(([n, g]) => g === target.shape.name).map(([n]) => n);
+  const allVoters = Object.entries(target.receivedVotes);
+
+  const wrap = el('div', {class:'flex col grow scroll', style:'padding: 12px 4px; gap:14px;'});
+  wrap.appendChild(el('div', {style:'display:flex; align-items:center; gap:10px; padding: 4px;'},
+    el('div', {class:'swatch', style:`background:${target.color}; color:${target.color}; width:20px; height:20px;`}),
+    el('div', {style:'font-weight:600; font-size:18px;'}, target.name),
+    el('div', {class:'mono dim', style:'font-size:12px; margin-left:auto;'}, `+${correctVoters.length} pts`)
+  ));
+
+  const canvasBox = el('div', {class:'vote-canvas-wrap', style:'max-height: 50vh;'});
+  const cv = el('canvas');
+  canvasBox.appendChild(cv);
+  wrap.appendChild(canvasBox);
+
+  wrap.appendChild(el('div', {class:'truth'},
+    el('span', {class:'ico'}, target.shape.icon),
+    el('div', {},
+      el('div', {style:'font-weight:600;'}, `It was a ${target.shape.name}.`),
+      el('div', {class:'dim', style:'font-size:13px;'}, correctVoters.length === 0 ? 'No one saw it.' :
+        correctVoters.length === allVoters.length ? 'Everyone saw it!' :
+        `${correctVoters.length} of ${allVoters.length} read it correctly.`)
+    )
+  ));
+
+  const voteList = el('div', {class:'flex col gap-1', style:'margin-top:4px;'});
+  for (const [voterName, guess] of allVoters) {
+    const right = guess === target.shape.name;
+    const voter = S.players.find(p => p.name === voterName);
+    voteList.appendChild(el('div', {style:`display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:12px; background: rgba(11,16,44,0.4); border: 1px solid ${right ? 'rgba(159,224,122,0.3)' : 'rgba(247,233,194,0.08)'};`},
+      el('div', {class:'swatch', style:`background:${voter.color}; color:${voter.color}; width:10px; height:10px;`}),
+      el('div', {style:'flex:1;'}, voterName),
+      el('div', {class:'dim', style:`font-size:14px; color:${right ? 'var(--green)' : 'var(--ink-dim)'};`}, (guess || '—') + (right ? ' ✓' : ''))
+    ));
+  }
+  wrap.appendChild(voteList);
+
+  wrap.appendChild(el('button', {
+    class:'btn primary block',
+    style:'margin-top: 12px;',
+    onclick: () => { ding(); S.revealIndex++; S.screen = 'pass-reveal'; render(); }
+  }, S.revealIndex === S.players.length - 1 ? 'See the scoreboard →' : 'Next →'));
+
+  setTimeout(() => {
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvasBox.clientWidth, H = canvasBox.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    redrawStrokes(ctx, target.strokesByPlayer, W, H);
+  }, 30);
+
+  return wrap;
+}
+
+function renderScore() {
+  const sorted = [...S.players].sort((a, b) => b.score - a.score);
+  const isLast = S.match >= TOTAL_MATCHES - 1;
+
+  const wrap = el('div', {class:'flex col grow scroll', style:'padding: 20px 8px; gap:16px;'});
+  wrap.appendChild(el('div', {class:'pill mono'}, isLast ? 'final scores' : `match ${S.match + 1} of ${TOTAL_MATCHES}`));
+  wrap.appendChild(el('h2', {}, isLast ? '★ The night ends.' : 'The match closes.'));
+
+  const list = el('div', {class:'flex col gap-1'});
+  sorted.forEach((p, i) => {
+    list.appendChild(el('div', {class: 'score-row' + (i === 0 ? ' lead' : '')},
+      el('div', {style:'display:flex; align-items:center; gap:12px;'},
+        el('div', {class:'swatch', style:`background:${p.color}; color:${p.color}; width:14px; height:14px;`}),
+        el('div', {},
+          el('div', {style:'font-weight:600;'}, p.name),
+          el('div', {class:'dim', style:'font-size:12px;'}, i === 0 && isLast ? 'wins the night' : i === 0 ? 'leading' : '')
+        )
+      ),
+      el('div', {class:'score-num'}, String(p.score))
+    ));
+  });
+  wrap.appendChild(list);
+
+  if (isLast) {
+    wrap.appendChild(el('button', {class:'btn primary block', style:'margin-top:16px;', onclick: () => {
+      chime();
+      S.players.forEach(p => p.score = 0);
+      S.match = 0;
+      assignShapes();
+      render();
+    }}, 'Play again'));
+    wrap.appendChild(el('button', {class:'btn ghost block dim small', onclick: () => { S = null; render(); }}, 'Back to title'));
+  } else {
+    wrap.appendChild(el('button', {class:'btn primary block', style:'margin-top:16px;', onclick: () => {
+      chime();
+      S.match++;
+      assignShapes();
+      render();
+    }}, `Next match →`));
+  }
+  return wrap;
+}
+
+/* ====================== BOOT ====================== */
+S = null;
+render();
+window.addEventListener('resize', () => { if (S) render(); });
+
+// Prevent iOS rubber-band scroll on background
+document.addEventListener('touchmove', (e) => {
+  if (e.target.closest('.scroll') || e.target.closest('canvas')) return;
+  e.preventDefault();
+}, { passive: false });
+
+</script>
+</body>
+</html>
