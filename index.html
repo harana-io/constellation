@@ -264,18 +264,19 @@ const PLAYER_COLORS = ['var(--p1)', 'var(--p2)', 'var(--p3)', 'var(--p4)'];
 const PLAYER_HEX    = ['#f5c66b', '#6fe2d8', '#ff8aa8', '#b48cff'];
 
 const TWIST = [
-  { name: 'A Fresh Sky',         desc: 'The first match. Find your style. You\'ve got five strokes and a secret shape — nothing else matters.' },
-  { name: 'Mid-Sky',             desc: 'You\'ve seen how each other draws now. Try to surprise them. New shapes, fresh canvases.' },
-  { name: 'Final Constellation', desc: 'Last match of the night. Whatever you\'ve learned, this is when it pays off. Make it count.' },
+  { name: 'A Fresh Sky',         desc: 'Opening round. Find your style. Five strokes, one secret shape — nothing else matters.' },
+  { name: 'Mid-Sky',             desc: 'You\'ve seen how each other draws. Try to surprise them. New shapes, fresh canvases.' },
+  { name: 'The Turning Point',   desc: 'The field is taking shape. Use what you know, or bury it.' },
+  { name: 'Deep Sky',            desc: 'The tension builds. Every guess counts now.' },
+  { name: 'Final Constellation', desc: 'Last round of the night. Whatever you\'ve learned, this is when it pays off. Make it count.' },
 ];
 
 const STROKES_PER_PLAYER = 5;
-const TOTAL_MATCHES = 3;
 
 /* ====================== STATE ====================== */
 let S = null;
 
-function newGame(players) {
+function newGame(players, totalMatches, teamsMode) {
   S = {
     screen: 'reveal-shape',
     players: players.map((name, i) => ({
@@ -284,16 +285,19 @@ function newGame(players) {
       score: 0,
       shape: null,
       whisper: '',
-      strokesByPlayer: [], // strokes drawn ON this player's canvas (during draw phase) — only own player draws on own canvas
-      receivedVotes: {},   // {voterName: shapeName}
+      strokesByPlayer: [],
+      receivedVotes: {},
+      teamIdx: teamsMode ? (i < 2 ? 0 : 1) : null,
     })),
     match: 0,
+    totalMatches,
+    teamsMode,
     shapeReveals: 0,
     drawTurnPlayer: 0,
-    drawTurnIndex: 0,        // 0..N*STROKES-1 across all draws this match
-    voteIndex: 0,            // which player is currently voting
-    voteTargetIdx: 0,        // which canvas they're voting on next
-    voteSelections: {},      // {voterName: {targetName: shapeName}}
+    drawTurnIndex: 0,
+    voteIndex: 0,
+    voteTargetIdx: 0,
+    voteSelections: {},
     revealIndex: 0,
     twistAcked: false,
   };
@@ -370,7 +374,7 @@ function renderTitle() {
     ),
     el('div', {class:'tagline'}, 'Five strokes. One secret shape. Whoever reads the stars best wins.'),
     el('div', {class:'flex col gap-1', style:'width:100%; max-width:300px;'},
-      el('button', {class:'btn primary block', onclick: () => { ac(); chime(); S = { screen:'setup', players:['','','',''], count:4 }; render(); }}, 'New Game'),
+      el('button', {class:'btn primary block', onclick: () => { ac(); chime(); S = { screen:'setup', players:['','','',''], count:4, rounds:3, teamsMode:false }; render(); }}, 'New Game'),
       el('button', {class:'btn ghost block small dim', onclick: showRules}, 'How to play')
     )
   );
@@ -384,7 +388,7 @@ function showRules() {
       el('p', {class:'dim'}, '2. Take turns. On your turn you add ONE stroke to YOUR canvas, trying to evoke your shape. You get 5 strokes total across the match.'),
       el('p', {class:'dim'}, '3. After everyone has drawn, the phone passes around once more. Each player privately guesses what shape every OTHER player was drawing.'),
       el('p', {class:'dim'}, '4. Score: +2 per correct guess you make · +1 per voter who correctly reads YOUR canvas.'),
-      el('p', {class:'dim'}, '5. Three matches per game. Each match has a new twist.'),
+      el('p', {class:'dim'}, '5. Play 1–5 rounds per game. Each round has a new twist. Highest score (or team score) wins.'),
       el('p', {class:'mono', style:'margin-top:18px; color: var(--gold);'}, 'Tap to dismiss')
     )
   );
@@ -393,7 +397,13 @@ function showRules() {
 
 function renderSetup() {
   const update = () => render();
-  const setCount = (n) => { S.count = n; S.players = S.players.slice(0, n); while(S.players.length < n) S.players.push(''); update(); };
+  const setCount = (n) => {
+    S.count = n;
+    S.players = S.players.slice(0, n);
+    while (S.players.length < n) S.players.push('');
+    if (n !== 4) S.teamsMode = false;
+    update();
+  };
 
   const rows = [];
   for (let i = 0; i < S.count; i++) {
@@ -407,22 +417,66 @@ function renderSetup() {
     ));
   }
 
-  return el('div', {class:'flex col grow scroll', style:'padding:24px 8px; gap:22px;'},
+  const controls = [
+    el('div', {class:'flex col gap-1'},
+      el('div', {class:'mono dim', style:'font-size:12px; letter-spacing:0.05em; text-transform:uppercase; padding: 0 2px;'}, 'Players'),
+      el('div', {class:'seg'},
+        ...[2,3,4].map(n => el('button', {
+          class: S.count === n ? 'active' : '',
+          onclick: () => setCount(n)
+        }, String(n)))
+      )
+    ),
+    el('div', {class:'flex col gap-1'},
+      el('div', {class:'mono dim', style:'font-size:12px; letter-spacing:0.05em; text-transform:uppercase; padding: 0 2px;'}, 'Rounds'),
+      el('div', {class:'seg'},
+        ...[1,2,3,4,5].map(n => el('button', {
+          class: S.rounds === n ? 'active' : '',
+          onclick: () => { S.rounds = n; update(); }
+        }, String(n)))
+      )
+    ),
+  ];
+
+  if (S.count === 4) {
+    controls.push(
+      el('div', {class:'flex col gap-1'},
+        el('div', {class:'mono dim', style:'font-size:12px; letter-spacing:0.05em; text-transform:uppercase; padding: 0 2px;'}, 'Mode'),
+        el('div', {class:'seg'},
+          el('button', { class: !S.teamsMode ? 'active' : '', onclick: () => { S.teamsMode = false; update(); } }, 'Free for All'),
+          el('button', { class: S.teamsMode ? 'active' : '', onclick: () => { S.teamsMode = true; update(); } }, 'Teams')
+        )
+      )
+    );
+  }
+
+  if (S.count === 4 && S.teamsMode) {
+    const names = S.players.map((v, i) => (v || `Player ${i+1}`).slice(0, 12));
+    controls.push(
+      el('div', {style:'display:flex; gap:8px;'},
+        el('div', {style:`flex:1; padding:10px 12px; border-radius:12px; background:rgba(245,198,107,0.08); border:1px solid rgba(245,198,107,0.2); font-size:13px;`},
+          el('div', {class:'mono dim', style:'font-size:11px; margin-bottom:4px;'}, 'TEAM A'),
+          el('div', {}, names[0]), el('div', {}, names[1])
+        ),
+        el('div', {style:`flex:1; padding:10px 12px; border-radius:12px; background:rgba(255,138,168,0.08); border:1px solid rgba(255,138,168,0.2); font-size:13px;`},
+          el('div', {class:'mono dim', style:'font-size:11px; margin-bottom:4px;'}, 'TEAM B'),
+          el('div', {}, names[2]), el('div', {}, names[3])
+        )
+      )
+    );
+  }
+
+  return el('div', {class:'flex col grow scroll', style:'padding:24px 8px; gap:18px;'},
     el('div', {class:'flex col gap-1'},
       el('h2', {}, 'Who\'s playing tonight?'),
-      el('div', {class:'dim'}, 'Tap to enter names. The phone will pass between you — only the active player should look.')
+      el('div', {class:'dim'}, 'The phone will pass between you — only the active player should look.')
     ),
-    el('div', {class:'seg'},
-      ...[2,3,4].map(n => el('button', {
-        class: S.count === n ? 'active' : '',
-        onclick: () => setCount(n)
-      }, `${n} players`))
-    ),
+    ...controls,
     el('div', {class:'flex col gap-2'}, rows),
     el('div', {class:'flex col gap-1', style:'margin-top:auto; padding-top:16px;'},
       el('button', {class:'btn primary block', onclick: () => {
         chime();
-        newGame(S.players.slice(0, S.count));
+        newGame(S.players.slice(0, S.count), S.rounds, S.teamsMode);
       }}, 'Begin →'),
       el('button', {class:'btn ghost block small dim', onclick: () => { S = null; render(); }}, '← Back')
     )
@@ -430,9 +484,11 @@ function renderSetup() {
 }
 
 function renderTwist() {
-  const t = TWIST[S.match];
+  const twistIdx = S.totalMatches <= 1 ? TWIST.length - 1
+    : Math.round(S.match * (TWIST.length - 1) / (S.totalMatches - 1));
+  const t = TWIST[twistIdx];
   return el('div', {class:'pass-wrap', onclick: () => { ding(); S.screen = 'reveal-shape'; render(); }},
-    el('div', {class:'pill mono'}, `match ${S.match + 1} of ${TOTAL_MATCHES}`),
+    el('div', {class:'pill mono'}, `round ${S.match + 1} of ${S.totalMatches}`),
     el('h2', {style:'color: var(--gold); margin-top: 12px;'}, t.name),
     el('div', {class:'dim', style:'max-width:300px; margin-top:4px;'}, t.desc),
     el('div', {class:'pulse mono dim', style:'margin-top:auto; padding-bottom: 20px;'}, 'tap to continue')
@@ -669,7 +725,9 @@ function scoreGuess(rawGuess, targetShapeName) {
 
 function renderVote() {
   const voter = S.players[S.voteIndex];
-  const targets = S.players.filter(p => p.name !== voter.name);
+  const targets = S.teamsMode
+    ? S.players.filter(p => p.teamIdx !== voter.teamIdx)
+    : S.players.filter(p => p.name !== voter.name);
 
   if (S.voteTargetIdx >= targets.length) {
     S.voteIndex++;
@@ -842,26 +900,58 @@ function renderReveal() {
 }
 
 function renderScore() {
-  const sorted = [...S.players].sort((a, b) => b.score - a.score);
-  const isLast = S.match >= TOTAL_MATCHES - 1;
+  const isLast = S.match >= S.totalMatches - 1;
 
   const wrap = el('div', {class:'flex col grow scroll', style:'padding: 20px 8px; gap:16px;'});
-  wrap.appendChild(el('div', {class:'pill mono'}, isLast ? 'final scores' : `match ${S.match + 1} of ${TOTAL_MATCHES}`));
-  wrap.appendChild(el('h2', {}, isLast ? '★ The night ends.' : 'The match closes.'));
+  wrap.appendChild(el('div', {class:'pill mono'}, isLast ? 'final scores' : `round ${S.match + 1} of ${S.totalMatches}`));
 
   const list = el('div', {class:'flex col gap-1'});
-  sorted.forEach((p, i) => {
-    list.appendChild(el('div', {class: 'score-row' + (i === 0 ? ' lead' : '')},
-      el('div', {style:'display:flex; align-items:center; gap:12px;'},
-        el('div', {class:'swatch', style:`background:${p.color}; color:${p.color}; width:14px; height:14px;`}),
-        el('div', {},
-          el('div', {style:'font-weight:600;'}, p.name),
-          el('div', {class:'dim', style:'font-size:12px;'}, i === 0 && isLast ? 'wins the night' : i === 0 ? 'leading' : '')
+
+  if (S.teamsMode) {
+    const teams = [
+      { label: 'Team A', color: PLAYER_HEX[0], players: S.players.slice(0, 2) },
+      { label: 'Team B', color: PLAYER_HEX[2], players: S.players.slice(2, 4) },
+    ].map(t => ({ ...t, score: t.players.reduce((s, p) => s + p.score, 0) }))
+     .sort((a, b) => b.score - a.score);
+
+    const winnerLabel = teams[0].score === teams[1].score ? null : teams[0].label;
+    wrap.appendChild(el('h2', {}, isLast
+      ? (winnerLabel ? `★ ${winnerLabel} wins the night.` : '★ It\'s a tie.')
+      : 'The round closes.'));
+
+    teams.forEach((team, i) => {
+      list.appendChild(el('div', {class: 'score-row' + (i === 0 ? ' lead' : ''), style:'flex-direction:column; align-items:stretch; gap:8px;'},
+        el('div', {style:'display:flex; align-items:center; justify-content:space-between;'},
+          el('div', {style:`font-weight:700; font-size:15px; color:${team.color}; text-transform:uppercase; letter-spacing:0.06em;`}, team.label),
+          el('div', {class:'score-num'}, String(team.score))
+        ),
+        el('div', {style:'display:flex; flex-direction:column; gap:4px;'},
+          ...team.players.map(p =>
+            el('div', {style:'display:flex; align-items:center; gap:8px; padding-left:4px;'},
+              el('div', {class:'swatch', style:`background:${p.color}; color:${p.color}; width:8px; height:8px;`}),
+              el('div', {class:'dim', style:'flex:1; font-size:13px;'}, p.name),
+              el('div', {class:'dim', style:'font-size:13px;'}, String(p.score))
+            )
+          )
         )
-      ),
-      el('div', {class:'score-num'}, String(p.score))
-    ));
-  });
+      ));
+    });
+  } else {
+    const sorted = [...S.players].sort((a, b) => b.score - a.score);
+    wrap.appendChild(el('h2', {}, isLast ? '★ The night ends.' : 'The round closes.'));
+    sorted.forEach((p, i) => {
+      list.appendChild(el('div', {class: 'score-row' + (i === 0 ? ' lead' : '')},
+        el('div', {style:'display:flex; align-items:center; gap:12px;'},
+          el('div', {class:'swatch', style:`background:${p.color}; color:${p.color}; width:14px; height:14px;`}),
+          el('div', {},
+            el('div', {style:'font-weight:600;'}, p.name),
+            el('div', {class:'dim', style:'font-size:12px;'}, i === 0 && isLast ? 'wins the night' : i === 0 ? 'leading' : '')
+          )
+        ),
+        el('div', {class:'score-num'}, String(p.score))
+      ));
+    });
+  }
   wrap.appendChild(list);
 
   if (isLast) {
@@ -879,7 +969,7 @@ function renderScore() {
       S.match++;
       assignShapes();
       render();
-    }}, `Next match →`));
+    }}, 'Next round →'));
   }
   return wrap;
 }
