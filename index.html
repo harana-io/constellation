@@ -265,9 +265,9 @@ const PLAYER_COLORS = ['var(--p1)', 'var(--p2)', 'var(--p3)', 'var(--p4)'];
 const PLAYER_HEX    = ['#f5c66b', '#6fe2d8', '#ff8aa8', '#b48cff'];
 
 const TWIST = [
-  null,                                  // match 1: pure
-  { name: 'Mirrored Match', desc: 'Your last stroke is automatically mirrored on a random opponent\'s canvas.' },
-  { name: 'Whispered Match', desc: 'After drawing, secretly write a 1-word "title" — shown at the reveal.' },
+  { name: 'A Fresh Sky',         desc: 'The first match. Find your style. You\'ve got three strokes and a secret shape — nothing else matters.' },
+  { name: 'Mid-Sky',             desc: 'You\'ve seen how each other draws now. Try to surprise them. New shapes, fresh canvases.' },
+  { name: 'Final Constellation', desc: 'Last match of the night. Whatever you\'ve learned, this is when it pays off. Make it count.' },
 ];
 
 const STROKES_PER_PLAYER = 3;
@@ -313,7 +313,7 @@ function assignShapes() {
   S.voteSelections = {};
   S.revealIndex = 0;
   S.twistAcked = false;
-  S.screen = TWIST[S.match] ? 'twist' : 'reveal-shape';
+  S.screen = 'twist';
 }
 
 /* ====================== HELPERS ====================== */
@@ -349,7 +349,6 @@ function render() {
     'pass-reveal': renderPassReveal,
     reveal:        renderReveal,
     score:         renderScore,
-    end:           renderEnd,
   })[S?.screen || 'title']();
   screen.classList.add('fade-in');
   root.appendChild(screen);
@@ -429,8 +428,8 @@ function renderTwist() {
   const t = TWIST[S.match];
   return el('div', {class:'pass-wrap', onclick: () => { ding(); S.screen = 'reveal-shape'; render(); }},
     el('div', {class:'pill mono'}, `match ${S.match + 1} of ${TOTAL_MATCHES}`),
-    el('h2', {style:'color: var(--gold); margin-top: 12px;'}, t ? t.name : 'A Fresh Sky'),
-    el('div', {class:'dim', style:'max-width:300px; margin-top:4px;'}, t ? t.desc : 'The first match. No twists — just learn the rhythm.'),
+    el('h2', {style:'color: var(--gold); margin-top: 12px;'}, t.name),
+    el('div', {class:'dim', style:'max-width:300px; margin-top:4px;'}, t.desc),
     el('div', {class:'pulse mono dim', style:'margin-top:auto; padding-bottom: 20px;'}, 'tap to continue')
   );
 }
