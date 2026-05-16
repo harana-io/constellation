@@ -140,11 +140,9 @@
   .vote-canvas-wrap { position: relative; width: 100%; aspect-ratio: 1; border-radius: 18px; overflow: hidden; border: 1px solid rgba(247,233,194,0.15); background: rgba(6,9,32,0.5); margin: 0 auto; }
   .vote-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
   .vote-author { position: absolute; bottom: 10px; left: 10px; display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(6,9,32,0.7); border-radius: 999px; font-size: 13px; backdrop-filter: blur(6px); }
-  .shape-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
-  .shape-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border-radius: 12px; border: 1px solid rgba(247,233,194,0.15); background: rgba(11,16,44,0.4); color: var(--ink); cursor: pointer; transition: all 0.15s; font-size: 11px; }
-  .shape-btn .ico { font-size: 24px; }
-  .shape-btn.selected { background: rgba(245,198,107,0.18); border-color: var(--gold); box-shadow: 0 0 14px rgba(245,198,107,0.3); }
-  .shape-btn:active { transform: scale(0.95); }
+  .vote-input { width: 100%; padding: 12px 16px; border-radius: 12px; background: rgba(11,16,44,0.6); border: 1px solid rgba(247,233,194,0.25); color: var(--ink); font-size: 18px; font-family: inherit; outline: none; text-align: center; margin-top: 16px; box-sizing: border-box; }
+  .vote-input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(245,198,107,0.2); }
+  .vote-input::placeholder { color: rgba(247,233,194,0.3); }
 
   /* REVEAL */
   .reveal-card { position: relative; }
@@ -643,9 +641,34 @@ function renderPassVote() {
   );
 }
 
+function normalize(s) {
+  return s.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m + 1}, (_, i) => Array.from({length: n + 1}, (_, j) => i || j));
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+function scoreGuess(rawGuess, targetShapeName) {
+  const g = normalize(rawGuess);
+  const t = normalize(targetShapeName);
+  if (!g) return 'miss';
+  if (g === t) return 'exact';
+  if (g.split(/\s+/).includes(t) || t.split(/\s+/).includes(g)) return 'exact';
+  const maxDist = t.length <= 5 ? 1 : 2;
+  if (levenshtein(g, t) <= maxDist) return 'close';
+  if (g.length >= 3 && t.includes(g)) return 'close';
+  if (t.length >= 3 && g.includes(t)) return 'close';
+  return 'miss';
+}
+
 function renderVote() {
   const voter = S.players[S.voteIndex];
-  // Build list of targets = players other than voter
   const targets = S.players.filter(p => p.name !== voter.name);
 
   if (S.voteTargetIdx >= targets.length) {
@@ -656,18 +679,12 @@ function renderVote() {
 
   const target = targets[S.voteTargetIdx];
   if (!S.voteSelections[voter.name]) S.voteSelections[voter.name] = {};
-  const currentPick = S.voteSelections[voter.name][target.name];
-
-  // Build option pool: the shapes actually assigned this match (so 4 specific choices)
-  const usedShapes = S.players.map(p => p.shape);
 
   const wrap = el('div', {class:'flex col grow scroll', style:'padding: 8px;'});
-  const header = el('div', {style:'display:flex; align-items:center; justify-content:space-between; padding: 4px 4px 12px;'},
+  wrap.appendChild(el('div', {style:'display:flex; align-items:center; justify-content:space-between; padding: 4px 4px 12px;'},
     el('div', {style:`font-weight:600; color:${voter.color}`}, voter.name),
     el('div', {class:'mono dim', style:'font-size:12px;'}, `${S.voteTargetIdx + 1} / ${targets.length}`)
-  );
-  wrap.appendChild(header);
-
+  ));
   wrap.appendChild(el('h3', {style:'padding: 0 4px 8px;'}, `What was ${target.name} drawing?`));
 
   const canvasBox = el('div', {class:'vote-canvas-wrap', style:'max-width: clamp(150px, 52vmin, 240px);'});
@@ -679,32 +696,35 @@ function renderVote() {
   ));
   wrap.appendChild(canvasBox);
 
-  const grid = el('div', {class:'shape-grid'});
-  usedShapes.forEach(shape => {
-    const btn = el('button', {
-      class: 'shape-btn' + (currentPick === shape.name ? ' selected' : ''),
-      onclick: () => {
-        S.voteSelections[voter.name][target.name] = shape.name;
-        render();
-      }
-    },
-      el('div', {class:'ico'}, shape.icon),
-      el('div', {}, shape.name)
-    );
-    grid.appendChild(btn);
-  });
-  wrap.appendChild(grid);
+  const savedVal = S.voteSelections[voter.name][target.name] || '';
+  const isLast = S.voteTargetIdx === targets.length - 1;
 
-  wrap.appendChild(el('button', {
-    class:'btn primary block',
-    style:'margin-top: 16px;',
-    disabled: !currentPick,
-    onclick: () => {
-      ding();
-      S.voteTargetIdx++;
-      render();
+  const submitBtn = el('button', {
+    class: 'btn primary block',
+    style: 'margin-top: 16px;',
+    disabled: !savedVal.trim(),
+    onclick: () => { ding(); S.voteTargetIdx++; render(); }
+  }, isLast ? 'Submit votes →' : 'Lock in →');
+
+  const input = el('input', {
+    type: 'text',
+    class: 'vote-input',
+    placeholder: 'type your guess…',
+    autocomplete: 'off',
+    autocorrect: 'off',
+    autocapitalize: 'off',
+    spellcheck: 'false',
+    value: savedVal,
+    oninput: (e) => {
+      S.voteSelections[voter.name][target.name] = e.target.value;
+      submitBtn.disabled = !e.target.value.trim();
+    },
+    onkeydown: (e) => {
+      if (e.key === 'Enter' && e.target.value.trim()) { ding(); S.voteTargetIdx++; render(); }
     }
-  }, S.voteTargetIdx === targets.length - 1 ? 'Submit votes →' : 'Lock in →'));
+  });
+  wrap.appendChild(input);
+  wrap.appendChild(submitBtn);
 
   setTimeout(() => {
     const dpr = window.devicePixelRatio || 1;
@@ -715,31 +735,34 @@ function renderVote() {
     ctx.scale(dpr, dpr);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     redrawStrokes(ctx, target.strokesByPlayer, W, H);
+    input.focus();
   }, 30);
 
   return wrap;
 }
 
 function tallyVotes() {
-  // For each player, count how many voters identified their shape correctly
   for (const target of S.players) {
-    let correct = 0;
     for (const voter of S.players) {
       if (voter.name === target.name) continue;
-      const guess = S.voteSelections[voter.name]?.[target.name];
-      target.receivedVotes[voter.name] = guess;
-      if (guess === target.shape.name) correct++;
+      const raw = S.voteSelections[voter.name]?.[target.name] || '';
+      const tier = scoreGuess(raw, target.shape.name);
+      target.receivedVotes[voter.name] = { guess: raw, tier };
     }
-    target.score += correct; // +1 per voter who got yours right
   }
-  // Each voter: +2 per correct guess
+  for (const target of S.players) {
+    for (const { tier } of Object.values(target.receivedVotes)) {
+      if (tier === 'exact' || tier === 'close') target.score += 1;
+    }
+  }
   for (const voter of S.players) {
-    let correct = 0;
     for (const target of S.players) {
       if (target.name === voter.name) continue;
-      if (S.voteSelections[voter.name]?.[target.name] === target.shape.name) correct++;
+      const vote = target.receivedVotes[voter.name];
+      if (!vote) continue;
+      if (vote.tier === 'exact') voter.score += 2;
+      else if (vote.tier === 'close') voter.score += 1;
     }
-    voter.score += correct * 2;
   }
 }
 
@@ -759,14 +782,14 @@ function renderPassReveal() {
 
 function renderReveal() {
   const target = S.players[S.revealIndex];
-  const correctVoters = Object.entries(target.receivedVotes).filter(([n, g]) => g === target.shape.name).map(([n]) => n);
   const allVoters = Object.entries(target.receivedVotes);
+  const hitCount = allVoters.filter(([, v]) => v.tier === 'exact' || v.tier === 'close').length;
 
   const wrap = el('div', {class:'flex col grow scroll', style:'padding: 12px 4px; gap:14px;'});
   wrap.appendChild(el('div', {style:'display:flex; align-items:center; gap:10px; padding: 4px;'},
     el('div', {class:'swatch', style:`background:${target.color}; color:${target.color}; width:20px; height:20px;`}),
     el('div', {style:'font-weight:600; font-size:18px;'}, target.name),
-    el('div', {class:'mono dim', style:'font-size:12px; margin-left:auto;'}, `+${correctVoters.length} pts`)
+    el('div', {class:'mono dim', style:'font-size:12px; margin-left:auto;'}, `+${hitCount} pts`)
   ));
 
   const canvasBox = el('div', {class:'vote-canvas-wrap', style:'max-height: 50vh;'});
@@ -774,24 +797,26 @@ function renderReveal() {
   canvasBox.appendChild(cv);
   wrap.appendChild(canvasBox);
 
-  wrap.appendChild(el('div', {class:'truth'},
+  wrap.appendChild(el('div', {class: hitCount === 0 ? 'truth miss' : 'truth'},
     el('span', {class:'ico'}, target.shape.icon),
     el('div', {},
       el('div', {style:'font-weight:600;'}, `It was a ${target.shape.name}.`),
-      el('div', {class:'dim', style:'font-size:13px;'}, correctVoters.length === 0 ? 'No one saw it.' :
-        correctVoters.length === allVoters.length ? 'Everyone saw it!' :
-        `${correctVoters.length} of ${allVoters.length} read it correctly.`)
+      el('div', {class:'dim', style:'font-size:13px;'}, hitCount === 0 ? 'No one read it.' :
+        hitCount === allVoters.length ? 'Everyone read it!' :
+        `${hitCount} of ${allVoters.length} read it.`)
     )
   ));
 
   const voteList = el('div', {class:'flex col gap-1', style:'margin-top:4px;'});
-  for (const [voterName, guess] of allVoters) {
-    const right = guess === target.shape.name;
+  for (const [voterName, { guess, tier }] of allVoters) {
     const voter = S.players.find(p => p.name === voterName);
-    voteList.appendChild(el('div', {style:`display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:12px; background: rgba(11,16,44,0.4); border: 1px solid ${right ? 'rgba(159,224,122,0.3)' : 'rgba(247,233,194,0.08)'};`},
+    const borderColor = tier === 'exact' ? 'rgba(159,224,122,0.3)' : tier === 'close' ? 'rgba(245,198,107,0.3)' : 'rgba(247,233,194,0.08)';
+    const textColor = tier === 'exact' ? 'var(--green)' : tier === 'close' ? 'var(--gold)' : 'var(--ink-dim)';
+    const indicator = tier === 'exact' ? ' ✓' : tier === 'close' ? ' ~' : '';
+    voteList.appendChild(el('div', {style:`display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:12px; background: rgba(11,16,44,0.4); border: 1px solid ${borderColor};`},
       el('div', {class:'swatch', style:`background:${voter.color}; color:${voter.color}; width:10px; height:10px;`}),
       el('div', {style:'flex:1;'}, voterName),
-      el('div', {class:'dim', style:`font-size:14px; color:${right ? 'var(--green)' : 'var(--ink-dim)'};`}, (guess || '—') + (right ? ' ✓' : ''))
+      el('div', {class:'dim', style:`font-size:14px; color:${textColor};`}, (guess || '—') + indicator)
     ));
   }
   wrap.appendChild(voteList);
