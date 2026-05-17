@@ -260,8 +260,34 @@ const SHAPES = [
   {name: 'Octopus',  icon: '🐙'},
 ];
 
-const PLAYER_COLORS = ['var(--p1)', 'var(--p2)', 'var(--p3)', 'var(--p4)'];
-const PLAYER_HEX    = ['#f5c66b', '#6fe2d8', '#ff8aa8', '#b48cff'];
+const PLAYER_COLORS = ['var(--p1)', 'var(--p2)', 'var(--p3)', 'var(--p4)', 'var(--p5)', 'var(--p6)'];
+const PLAYER_HEX    = ['#f5c66b', '#6fe2d8', '#ff8aa8', '#b48cff', '#9fe07a', '#7ea8ff'];
+const TEAM_LABELS   = ['Team A', 'Team B', 'Team C'];
+
+function teamSizeOptions(count) {
+  // Returns array of allowed teamSize values (besides 0 = free for all).
+  if (count === 4) return [2];        // 2v2
+  if (count === 6) return [2, 3];     // 2v2v2 or 3v3
+  return [];
+}
+function teamModeLabel(count, size) {
+  if (!size) return 'Free for All';
+  const teams = count / size;
+  return Array(teams).fill(size).join('v'); // "2v2", "2v2v2", "3v3"
+}
+function getTeams(count, teamSize, players) {
+  if (!teamSize) return [];
+  const teams = [];
+  for (let t = 0; t < count / teamSize; t++) {
+    const start = t * teamSize;
+    teams.push({
+      label: TEAM_LABELS[t],
+      color: PLAYER_HEX[start],
+      players: players.slice(start, start + teamSize),
+    });
+  }
+  return teams;
+}
 
 const TWIST = [
   { name: 'A Fresh Sky',         desc: 'Opening round. Find your style. One secret shape, a handful of strokes — nothing else matters.' },
@@ -278,7 +304,7 @@ const STROKES_MAX = 6;
 /* ====================== STATE ====================== */
 let S = null;
 
-function newGame(players, totalMatches, teamsMode, strokes) {
+function newGame(players, totalMatches, teamSize, strokes) {
   S = {
     screen: 'reveal-shape',
     players: players.map((name, i) => ({
@@ -289,11 +315,12 @@ function newGame(players, totalMatches, teamsMode, strokes) {
       whisper: '',
       strokesByPlayer: [],
       receivedVotes: {},
-      teamIdx: teamsMode ? (i < 2 ? 0 : 1) : null,
+      teamIdx: teamSize > 0 ? Math.floor(i / teamSize) : null,
     })),
     match: 0,
     totalMatches,
-    teamsMode,
+    teamSize: teamSize || 0,
+    teamsMode: teamSize > 0,
     strokes: strokes || DEFAULT_STROKES,
     shapeReveals: 0,
     drawTurnPlayer: 0,
@@ -377,7 +404,7 @@ function renderTitle() {
     ),
     el('div', {class:'tagline'}, 'A few strokes. One secret shape. Whoever reads the stars best wins.'),
     el('div', {class:'flex col gap-1', style:'width:100%; max-width:300px;'},
-      el('button', {class:'btn primary block', onclick: () => { ac(); chime(); S = { screen:'setup', players:['','','',''], count:4, rounds:3, teamsMode:false, strokes: DEFAULT_STROKES }; render(); }}, 'New Game'),
+      el('button', {class:'btn primary block', onclick: () => { ac(); chime(); S = { screen:'setup', players:['','','','','',''], count:4, rounds:3, teamSize:0, strokes: DEFAULT_STROKES }; render(); }}, 'New Game'),
       el('button', {class:'btn ghost block small dim', onclick: showRules}, 'How to play')
     )
   );
@@ -402,9 +429,9 @@ function renderSetup() {
   const update = () => render();
   const setCount = (n) => {
     S.count = n;
-    S.players = S.players.slice(0, n);
     while (S.players.length < n) S.players.push('');
-    if (n !== 4) S.teamsMode = false;
+    // Reset team mode if the new count doesn't support the current teamSize
+    if (!teamSizeOptions(n).includes(S.teamSize)) S.teamSize = 0;
     update();
   };
 
@@ -424,7 +451,7 @@ function renderSetup() {
     el('div', {class:'flex col gap-1'},
       el('div', {class:'mono dim', style:'font-size:12px; letter-spacing:0.05em; text-transform:uppercase; padding: 0 2px;'}, 'Players'),
       el('div', {class:'seg'},
-        ...[2,3,4].map(n => el('button', {
+        ...[2,3,4,5,6].map(n => el('button', {
           class: S.count === n ? 'active' : '',
           onclick: () => setCount(n)
         }, String(n)))
@@ -442,7 +469,7 @@ function renderSetup() {
     el('div', {class:'flex col gap-1'},
       el('div', {class:'mono dim', style:'font-size:12px; letter-spacing:0.05em; text-transform:uppercase; padding: 0 2px;'}, 'Strokes per player'),
       el('div', {class:'seg'},
-        ...[3,4,5,6].map(n => el('button', {
+        ...[1,2,3,4,5,6].map(n => el('button', {
           class: S.strokes === n ? 'active' : '',
           onclick: () => { S.strokes = n; update(); }
         }, String(n)))
@@ -450,30 +477,36 @@ function renderSetup() {
     ),
   ];
 
-  if (S.count === 4) {
+  const teamOpts = teamSizeOptions(S.count);
+  if (teamOpts.length > 0) {
+    const modeButtons = [
+      el('button', { class: S.teamSize === 0 ? 'active' : '', onclick: () => { S.teamSize = 0; update(); } }, 'Free for All'),
+      ...teamOpts.map(size => el('button', {
+        class: S.teamSize === size ? 'active' : '',
+        onclick: () => { S.teamSize = size; update(); }
+      }, teamModeLabel(S.count, size)))
+    ];
     controls.push(
       el('div', {class:'flex col gap-1'},
         el('div', {class:'mono dim', style:'font-size:12px; letter-spacing:0.05em; text-transform:uppercase; padding: 0 2px;'}, 'Mode'),
-        el('div', {class:'seg'},
-          el('button', { class: !S.teamsMode ? 'active' : '', onclick: () => { S.teamsMode = false; update(); } }, 'Free for All'),
-          el('button', { class: S.teamsMode ? 'active' : '', onclick: () => { S.teamsMode = true; update(); } }, 'Teams')
-        )
+        el('div', {class:'seg'}, ...modeButtons)
       )
     );
   }
 
-  if (S.count === 4 && S.teamsMode) {
+  if (S.teamSize > 0) {
     const names = S.players.map((v, i) => (v || `Player ${i+1}`).slice(0, 12));
+    const teams = [];
+    for (let t = 0; t < S.count / S.teamSize; t++) {
+      const start = t * S.teamSize;
+      teams.push({ label: TEAM_LABELS[t], color: PLAYER_HEX[start], members: names.slice(start, start + S.teamSize) });
+    }
     controls.push(
-      el('div', {style:'display:flex; gap:8px;'},
-        el('div', {style:`flex:1; padding:10px 12px; border-radius:12px; background:rgba(245,198,107,0.08); border:1px solid rgba(245,198,107,0.2); font-size:13px;`},
-          el('div', {class:'mono dim', style:'font-size:11px; margin-bottom:4px;'}, 'TEAM A'),
-          el('div', {}, names[0]), el('div', {}, names[1])
-        ),
-        el('div', {style:`flex:1; padding:10px 12px; border-radius:12px; background:rgba(255,138,168,0.08); border:1px solid rgba(255,138,168,0.2); font-size:13px;`},
-          el('div', {class:'mono dim', style:'font-size:11px; margin-bottom:4px;'}, 'TEAM B'),
-          el('div', {}, names[2]), el('div', {}, names[3])
-        )
+      el('div', {style:`display:flex; gap:8px; flex-wrap:wrap;`},
+        ...teams.map(t => el('div', {style:`flex:1 1 30%; min-width:90px; padding:10px 12px; border-radius:12px; background:${t.color}14; border:1px solid ${t.color}33; font-size:13px;`},
+          el('div', {class:'mono dim', style:`font-size:11px; margin-bottom:4px; color:${t.color};`}, t.label.toUpperCase()),
+          ...t.members.map(n => el('div', {style:'overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'}, n))
+        ))
       )
     );
   }
@@ -488,7 +521,7 @@ function renderSetup() {
     el('div', {class:'flex col gap-1', style:'margin-top:auto; padding-top:16px;'},
       el('button', {class:'btn primary block', onclick: () => {
         chime();
-        newGame(S.players.slice(0, S.count), S.rounds, S.teamsMode, S.strokes);
+        newGame(S.players.slice(0, S.count), S.rounds, S.teamSize, S.strokes);
       }}, 'Begin →'),
       el('button', {class:'btn ghost block small dim', onclick: () => { S = null; render(); }}, '← Back')
     )
@@ -920,13 +953,13 @@ function renderScore() {
   const list = el('div', {class:'flex col gap-1'});
 
   if (S.teamsMode) {
-    const teams = [
-      { label: 'Team A', color: PLAYER_HEX[0], players: S.players.slice(0, 2) },
-      { label: 'Team B', color: PLAYER_HEX[2], players: S.players.slice(2, 4) },
-    ].map(t => ({ ...t, score: t.players.reduce((s, p) => s + p.score, 0) }))
-     .sort((a, b) => b.score - a.score);
+    const teams = getTeams(S.players.length, S.teamSize, S.players)
+      .map(t => ({ ...t, score: t.players.reduce((s, p) => s + p.score, 0) }))
+      .sort((a, b) => b.score - a.score);
 
-    const winnerLabel = teams[0].score === teams[1].score ? null : teams[0].label;
+    const topScore = teams[0].score;
+    const winners = teams.filter(t => t.score === topScore);
+    const winnerLabel = winners.length === 1 ? winners[0].label : null;
     wrap.appendChild(el('h2', {}, isLast
       ? (winnerLabel ? `★ ${winnerLabel} wins the night.` : '★ It\'s a tie.')
       : 'The round closes.'));

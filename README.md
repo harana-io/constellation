@@ -1,6 +1,6 @@
 # Constellation ★
 
-A pass-and-play party game for **2–4 players** that runs in any modern mobile browser, fully offline once loaded. One phone, one table, 1–5 rounds, configurable strokes, ~12–22 minutes per session. Designed for bars, dinner parties, and the back booth.
+A pass-and-play party game for **2–6 players** that runs in any modern mobile browser, fully offline once loaded. One phone, one table, 1–5 rounds, 1–6 strokes per player, free-for-all or team modes (2v2, 2v2v2, 3v3), ~10–25 minutes per session. Designed for bars, dinner parties, and the back booth.
 
 **Live link:** https://harana-io.github.io/constellation/
 **Repo:** https://github.com/harana-io/constellation
@@ -18,7 +18,7 @@ The constraint of a small stroke budget forces stylized, almost cubist art. The 
 
 ## The design rationale (so a new session can pick this up cold)
 
-The user asked for: a creative novel mobile browser game; iOS/Chrome compatible; 2–4 players (with optional teams-of-2); ~20 minutes max per game; fun for all ages; bar/dinner setting; pass-and-play *or* Bluetooth multi-device; deployable to Git for instant link sharing; addictive replay value; strong immersive design.
+The user asked for: a creative novel mobile browser game; iOS/Chrome compatible; 2–6 players (with optional teams-of-2); ~20 minutes max per game; fun for all ages; bar/dinner setting; pass-and-play *or* Bluetooth multi-device; deployable to Git for instant link sharing; addictive replay value; strong immersive design.
 
 Two important hard constraints we navigated:
 1. **iOS Safari has zero support for Web Bluetooth.** True phone-to-phone WebRTC also needs an internet signaling step. So genuinely-offline multi-device play in a mobile browser is essentially impossible. The answer that *feels* right for a bar setting is single-phone pass-and-play: no pairing friction, no four-battery anxiety, everyone watches the reveal together. We leaned into this as a feature, not a workaround.
@@ -29,7 +29,7 @@ The game concept needed to be novel enough not to feel like "Pictionary with ext
 - **Simultaneous private voting via free-text** (not multiple choice) — players type what they *think* was drawn, no hint pool. This rewards genuine interpretation and creates very funny mismatches at the reveal.
 - **Asymmetric scoring** — you score when others read your art correctly AND when you read others' art correctly, so passive players don't get bored.
 - **Round-by-round narrative pacing** — short flavor screens between rounds ("A Fresh Sky," "Mid-Sky," "Deep Sky," "Final Constellation") that scale to whatever round count the table picks.
-- **Optional teams mode** at 4 players (2v2) for "dinner couples" energy.
+- **Team modes** scale with the table: 4 players → 2v2, 6 players → 2v2v2 *or* 3v3. Voting always targets non-team players, and scoreboard tallies team totals.
 
 The cosmic visual theme (deep navy gradient, glowing colored ink strokes per player, twinkling starfield, serif italic display type) was chosen to make the game feel like an artifact rather than a utility — a candle on the table, not an app.
 
@@ -37,8 +37,8 @@ The cosmic visual theme (deep navy gradient, glowing colored ink strokes per pla
 
 ## Rules
 
-1. **2–4 players** sit around one phone.
-2. On the setup screen pick: **Players** (2/3/4), **Rounds** (1–5), **Strokes per player** (3–6), and for 4 players optionally **Teams** (2 vs. 2).
+1. **2–6 players** sit around one phone.
+2. On the setup screen pick: **Players** (2–6), **Rounds** (1–5), **Strokes per player** (1–6), and for 4 or 6 players optionally a **team mode** — 4 players supports 2v2; 6 players supports 2v2v2 (three pairs) or 3v3 (two trios).
 3. Each player is **secretly assigned a shape**. They look at it privately and pass the phone.
 4. **Drawing phase.** Round-robin. On your turn you add exactly **one** brushstroke to *your* canvas (lift finger = end of stroke). You get N strokes total per round, the setup setting.
 5. **Voting phase.** The phone passes once more. Each player privately *types* what they think each other player was drawing. Votes are sealed — no one sees others' guesses until the reveal.
@@ -113,9 +113,9 @@ function render() {
 
 **Key state fields on `S`:**
 - `S.players[]` — `{name, color, score, shape, strokesByPlayer:[], receivedVotes:{}, teamIdx}`
-- `S.strokes` — strokes-per-player-per-round, set on setup screen (3–6, default 4)
+- `S.strokes` — strokes-per-player-per-round, set on setup screen (1–6, default 4)
 - `S.totalMatches` — rounds-per-game (1–5)
-- `S.teamsMode` — boolean, only meaningful at 4 players
+- `S.teamSize` — 0 for free-for-all, or a positive int. 2 at 4 players = 2v2. 2 at 6 players = 2v2v2 (3 teams of 2). 3 at 6 players = 3v3 (2 teams of 3). Derived `S.teamsMode = teamSize > 0`.
 - `S.match` — current round index (0-based)
 - `S.drawTurnPlayer` / `S.drawTurnIndex` — round-robin draw turn tracking
 - `S.voteIndex` / `S.voteTargetIdx` — pass-and-vote pointer pair
@@ -165,7 +165,7 @@ If you're an AI assistant picking this up cold, here's the minimal context:
 3. **No build step.** Edit `index.html` directly. Test by serving the folder with any static server. Push to GitHub to deploy.
 4. **The single hardest bug** in this codebase's history was the `renderEnd` ReferenceError documented above. If the page renders only the starfield, look there first.
 5. **The user prefers pass-and-play over Bluetooth/multi-device.** This was a deliberate design call after we confirmed Web Bluetooth is fully unsupported on iOS Safari. Don't reopen this unless asked.
-6. **Adjustable settings on the setup screen:** Players (2–4), Rounds (1–5), Strokes per player (3–6), Mode (Free for All / Teams, 4p only).
+6. **Adjustable settings on the setup screen:** Players (2–6), Rounds (1–5), Strokes per player (1–6), Mode (Free for All; 2v2 at 4 players; 2v2v2 or 3v3 at 6 players).
 7. **All visual + audio polish lives in a single inline `<style>` and a small Web Audio helper at the top of `<script>`.** No external assets.
 
 ---
